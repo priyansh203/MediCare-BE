@@ -8,7 +8,6 @@ from typing import (
     Dict,
 )
 
-from dotenv import load_dotenv
 from fastapi import (
     FastAPI,
     Request,
@@ -31,17 +30,6 @@ from app.core.middleware import (
     MetricsMiddleware,
 )
 from app.services.database import database_service
-
-# Load environment variables
-load_dotenv()
-
-# Initialize Langfuse
-langfuse = Langfuse(
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    host=os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com"),
-)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

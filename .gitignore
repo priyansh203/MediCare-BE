@@ -8,7 +8,7 @@ wheels/
 *.jsonl
 
 # Virtual environments
-.venv
+.venv/
 
 # Environment variables
 .env
@@ -21,4 +21,3 @@ wheels/
 
 # Reports
 evals/reports/
-venv/
