@@ -406,8 +406,6 @@ When a discharge summary PDF is uploaded, the `medication_details` field is auto
   "source": "discharge_summary",
   "parsed_at": "2024-11-14T10:30:00",
   "discharge_summary_url": "https://cloudinary.com/.../discharge.pdf",
-  "patient_name_from_summary": "John Doe",
-  "discharge_date_from_summary": "2024-11-14",
   "diagnosis": "Post-MI, Type 2 Diabetes",
   "additional_notes": "Follow up in 2 weeks"
 }

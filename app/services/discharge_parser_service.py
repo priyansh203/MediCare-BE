@@ -18,6 +18,7 @@ from app.schemas.medications import (
     Reminder,
 )
 from app.schemas.patients import Followup, FollowupStatus
+from app.utils.pdf_service import generate_action_plan_pdf
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -230,6 +231,39 @@ Also extract:
 - **discharge_date**: Date of discharge (format: YYYY-MM-DD)
 - **diagnosis**: Primary diagnosis or condition
 - **additional_notes**: Any other relevant information, including warnings about medications to avoid
+
+**action_plan**: The action plan text. Note that don't make up any instructions. Only use the information that is provided in the document.
+            CRITICAL REQUIREMENTS:
+            1. Create a well-structured markdown document (NOT HTML)
+            2. Include a prominent title "Post-Discharge Action Plan" as a level 1 heading (# Post-Discharge Action Plan)
+            3. Expand and detail the action plan with:
+            - Clear step-by-step instructions for what the patient should do next
+            - Specific actions they need to take (e.g., "Take medication X at 10 AM daily")
+            - Timeline or schedule information (e.g., "For the next 7 days", "Starting tomorrow")
+            - Important warnings or precautions
+            - When to seek medical attention or emergency care
+            - Follow-up actions and reminders
+            - Any lifestyle modifications or restrictions
+            4. Format the content using proper markdown syntax:
+            - Use ## for major sections (e.g., "## Immediate Actions", "## Daily Care Instructions", "## Warning Signs", "## Follow-up Appointments")
+            - Use ### for subsections
+            - Use numbered lists (1., 2., 3.) for step-by-step instructions
+            - Use bullet points (- or *) for general information or reminders
+            - Use regular paragraphs for descriptive text (separated by blank lines)
+            - Use **bold** or *italic* for emphasis on critical information
+            - Use --- for horizontal rules to separate major sections if needed
+            5. Structure the document with clear sections:
+            - Immediate Actions (what to do right away)
+            - Daily Care Instructions (ongoing care)
+            - Medication Schedule (if applicable)
+            - Activity Guidelines (what they can/cannot do)
+            - Warning Signs (when to seek help)
+            - Follow-up Information
+            6. Use clean, readable markdown formatting that is easy to convert to PDF
+            7. Preserve ALL important information from the original text and expand on it with actionable details
+            8. Add specific, actionable next steps even if not explicitly mentioned in the original text (infer from context)
+            9. DO NOT use HTML tags - use ONLY markdown syntax
+
 - **appointment_followup**: Array of appointment followup dates. Extract any mentioned follow-up appointments, check-ups, or review dates.
   For each followup appointment, extract:
   - **reason**: Reason for the followup appointment
@@ -255,6 +289,7 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
     ],
     "diagnosis": "string or null",
     "additional_notes": "string or null",
+    "action_plan": "string or null",
     "appointment_followup": [
         {{
             "reason": "string",
@@ -265,6 +300,7 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
             "status": "not_confirmed"
         }}
     ]
+    
 }}
 
 Do not include any explanations, markdown formatting, or additional text. Return ONLY the JSON object.
@@ -446,8 +482,6 @@ async def parse_discharge_summary_with_vision(image_bytes_list: list[bytes], mod
                     dosage_str = (med_data.get("dosage") or "").lower()
                     combined_text = f"{name_str} {dosage_str} {frequency_str}".lower()
                     
-                    # Check if it's "twice daily" or similar patterns
-                    
                 
                 days = []
                 for d in med_data.get("days", []):
@@ -530,6 +564,20 @@ async def parse_discharge_summary_with_vision(image_bytes_list: list[bytes], mod
                     logger.warning(f"Error parsing followup: {str(e)}")
                     continue
             
+            # Generate action plan PDF if action_plan exists
+            action_plan_pdf_url = None
+            action_plan_text = parsed_json.get("action_plan")
+            if action_plan_text:
+                try:
+                    patient_name_for_pdf = parsed_json.get("patient_name") or "Unknown_Patient"
+                    logger.info("Generating action plan PDF...")
+                    action_plan_pdf_url = await generate_action_plan_pdf(action_plan_text, patient_name_for_pdf)
+                    if action_plan_pdf_url:
+                        logger.info(f"Action plan PDF generated and uploaded: {action_plan_pdf_url}")
+                except Exception as e:
+                    logger.warning(f"Failed to generate action plan PDF: {str(e)}")
+                    # Continue without PDF URL if generation fails
+            
             # Create final parsed result
             result = DischargeSummaryParsed(
                 medications=medications,
@@ -537,6 +585,8 @@ async def parse_discharge_summary_with_vision(image_bytes_list: list[bytes], mod
                 discharge_date=discharge_date,
                 diagnosis=parsed_json.get("diagnosis"),
                 additional_notes=parsed_json.get("additional_notes"),
+                action_plan=action_plan_text,
+                action_plan_pdf_url=action_plan_pdf_url,
                 appointment_followup=appointment_followups,
             )
             

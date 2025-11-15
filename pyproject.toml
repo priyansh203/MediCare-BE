@@ -40,6 +40,8 @@ dependencies = [
     "cloudinary>=1.41.0",
     "pymupdf>=1.23.0",
     "httpx>=0.28.1",
+    "xhtml2pdf>=0.2.13",
+    "markdown>=3.7.0",
 ]
 
 [project.optional-dependencies]

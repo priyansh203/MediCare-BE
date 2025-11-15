@@ -167,10 +167,10 @@ async def create_patient_endpoint(
                     "source": "discharge_summary",
                     "parsed_at": datetime.now().isoformat(),
                     "discharge_summary_url": discharge_summary_url,
-                    "patient_name_from_summary": parsed_data.patient_name,
-                    "discharge_date_from_summary": parsed_data.discharge_date.isoformat() if parsed_data.discharge_date else None,
                     "diagnosis": parsed_data.diagnosis,
-                    "additional_notes": parsed_data.additional_notes
+                    "additional_notes": parsed_data.additional_notes,
+                    "action_plan": parsed_data.action_plan,
+                    "action_plan_pdf_url": parsed_data.action_plan_pdf_url
                 }
                 
                 logger.info(f"✓ Successfully structured medication details: {len(medications_list)} medications")

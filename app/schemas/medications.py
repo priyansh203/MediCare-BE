@@ -76,6 +76,8 @@ class DischargeSummaryParsed(BaseModel):
     diagnosis: Optional[str] = Field(None, description="Diagnosis from discharge summary")
     additional_notes: Optional[str] = Field(None, description="Any additional relevant notes")
     appointment_followup: List[Followup] = Field(default_factory=list, description="List of appointment followups")
+    action_plan: Optional[str] = Field(None, description="Post-discharge action plan, care instructions, or treatment plan")
+    action_plan_pdf_url: Optional[str] = Field(None, description="Cloudinary URL of the generated action plan PDF")
 
 
 class DischargeSummaryUploadResponse(BaseModel):

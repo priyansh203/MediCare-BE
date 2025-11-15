@@ -2,10 +2,14 @@
 
 import io
 import logging
-from typing import List, Tuple
+import os
+from typing import List, Tuple, Optional
 from fastapi import UploadFile, HTTPException, status
 import fitz
+import httpx
+from dotenv import load_dotenv
 
+load_dotenv()
 logger = logging.getLogger(__name__)
 
 async def convert_pdf_bytes_to_images(pdf_bytes: bytes) -> List[bytes]:
@@ -275,4 +279,167 @@ async def process_pdf_bill(pdf_file: UploadFile, patient_name: str) -> Tuple[str
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process bill: {str(e)}"
+        )
+
+async def generate_action_plan_pdf(action_plan: str, patient_name: str) -> Optional[str]:
+    """
+    Generate a PDF from markdown action_plan by converting markdown to HTML, then to PDF and upload to Cloudinary.
+    
+    Args:
+        action_plan: Action plan markdown content
+        patient_name: Patient name for folder organization
+    
+    Returns:
+        str: Cloudinary URL of the uploaded PDF, or None if action_plan is empty
+    
+    Raises:
+        HTTPException: If PDF generation or upload fails
+    """
+    if not action_plan or not action_plan.strip():
+        logger.info("No action plan provided, skipping PDF generation")
+        return None
+    
+    try:
+        import cloudinary.uploader
+        import markdown
+        from xhtml2pdf import pisa
+        
+        # Step 1: Convert markdown to HTML
+        logger.info("Step 1: Converting markdown to HTML...")
+        html_content = markdown.markdown(
+            action_plan,
+            extensions=['extra', 'nl2br', 'sane_lists']
+        )
+        
+        # Wrap HTML content with proper structure and styling for PDF
+        html_document = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page {{
+            size: A4;
+            margin: 2cm;
+        }}
+        body {{
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #000;
+            margin: 0;
+            padding: 0;
+        }}
+        h1 {{
+            font-size: 24pt;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 20pt;
+            margin-bottom: 15pt;
+            border-bottom: 2pt solid #3498db;
+            padding-bottom: 10pt;
+        }}
+        h2 {{
+            font-size: 18pt;
+            font-weight: bold;
+            color: #34495e;
+            margin-top: 18pt;
+            margin-bottom: 12pt;
+        }}
+        h3 {{
+            font-size: 14pt;
+            font-weight: bold;
+            color: #34495e;
+            margin-top: 15pt;
+            margin-bottom: 10pt;
+        }}
+        p {{
+            margin-bottom: 10pt;
+            text-align: justify;
+        }}
+        ul, ol {{
+            margin-bottom: 10pt;
+            padding-left: 20pt;
+        }}
+        li {{
+            margin-bottom: 5pt;
+        }}
+        strong {{
+            font-weight: bold;
+            color: #2c3e50;
+        }}
+        em {{
+            font-style: italic;
+        }}
+        hr {{
+            border: none;
+            border-top: 1pt solid #ddd;
+            margin: 15pt 0;
+        }}
+    </style>
+</head>
+<body>
+    {html_content}
+</body>
+</html>"""
+        
+        # Step 2: Convert HTML to PDF bytes using xhtml2pdf
+        logger.info("Step 2: Converting HTML to PDF...")
+        pdf_buffer = io.BytesIO()
+        pisa_status = pisa.CreatePDF(
+            src=html_document,
+            dest=pdf_buffer,
+            encoding='utf-8'
+        )
+        
+        if pisa_status.err:
+            logger.error(f"Error creating PDF: {pisa_status.err}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create PDF from HTML: {pisa_status.err}"
+            )
+        
+        pdf_bytes = pdf_buffer.getvalue()
+        pdf_buffer.close()
+        logger.info(f"PDF generated: {len(pdf_bytes)} bytes")
+        
+        # Step 3: Upload PDF to Cloudinary
+        folder_name = patient_name.replace(' ', '_')
+        folder = f"medicare/patients/{folder_name}/action_plans"
+        
+        logger.info(f"Step 3: Uploading action plan PDF to Cloudinary folder: {folder}")
+        upload_result = cloudinary.uploader.upload(
+            pdf_bytes,
+            folder=folder,
+            resource_type="raw",
+            format="pdf",
+            type="upload",
+            invalidate=True,
+            use_filename=True,
+            unique_filename=True,
+        )
+        
+        # Get secure URL
+        pdf_url = upload_result.get("secure_url") or upload_result.get("url")
+        if not pdf_url:
+            public_id = upload_result.get("public_id", "")
+            cloud_name = upload_result.get("cloud_name") or os.getenv("CLOUDINARY_CLOUD_NAME")
+            pdf_url = f"https://res.cloudinary.com/{cloud_name}/raw/upload/{public_id}.pdf"
+        
+        logger.info(f"Action plan PDF uploaded: {pdf_url}")
+        return pdf_url
+        
+    except ImportError as e:
+        missing_lib = "markdown" if "markdown" in str(e) else "xhtml2pdf"
+        logger.error(f"{missing_lib} is not installed. Please install it: pip install {missing_lib}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF generation library ({missing_lib}) is not installed"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating action plan PDF: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate action plan PDF: {str(e)}"
         )
