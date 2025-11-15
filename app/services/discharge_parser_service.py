@@ -23,6 +23,75 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
+def convert_time_to_iso(time_str: str, date_obj: date) -> str:
+    """
+    Convert time string from formats like '10:00AM', '6:00PM' to ISO 8601 format 'YYYY-MM-DDTHH:mm:ssZ'.
+    
+    Args:
+        time_str: Time string in formats like '10:00AM', '6:00PM', '10:00', etc.
+        date_obj: Date object to combine with time
+    
+    Returns:
+        ISO 8601 format datetime string (YYYY-MM-DDTHH:mm:ssZ) in 24-hour format
+    """
+    try:
+        # Remove whitespace and convert to uppercase
+        time_str = time_str.strip().upper()
+        
+        # Check if it's already in 24-hour format (contains no AM/PM)
+        if 'AM' not in time_str and 'PM' not in time_str:
+            # If it's already in HH:MM format, add seconds
+            if ':' in time_str:
+                parts = time_str.split(':')
+                if len(parts) == 2:
+                    hour = int(parts[0])
+                    minute = int(parts[1])
+                    second = 0
+                elif len(parts) == 3:
+                    hour = int(parts[0])
+                    minute = int(parts[1])
+                    second = int(parts[2])
+                else:
+                    hour = int(parts[0])
+                    minute = 0
+                    second = 0
+            else:
+                hour = int(time_str)
+                minute = 0
+                second = 0
+        else:
+            # Parse AM/PM format
+            is_pm = 'PM' in time_str
+            time_str = time_str.replace('AM', '').replace('PM', '').strip()
+            
+            # Split hours and minutes
+            if ':' in time_str:
+                parts = time_str.split(':')
+                hour = int(parts[0])
+                minute = int(parts[1]) if len(parts) > 1 else 0
+                second = int(parts[2]) if len(parts) > 2 else 0
+            else:
+                # Just hour, no minutes
+                hour = int(time_str)
+                minute = 0
+                second = 0
+            
+            # Convert to 24-hour format
+            if is_pm and hour != 12:
+                hour += 12
+            elif not is_pm and hour == 12:
+                hour = 0
+        
+        # Combine date and time into ISO 8601 format
+        datetime_obj = datetime.combine(date_obj, datetime.min.time().replace(hour=hour, minute=minute, second=second))
+        return datetime_obj.strftime("%Y-%m-%dT%H:%M:%SZ")
+    except (ValueError, AttributeError) as e:
+        logger.warning(f"Failed to convert time '{time_str}' to ISO format: {str(e)}")
+        # Return default time with the provided date
+        default_time = datetime.combine(date_obj, datetime.min.time().replace(hour=10, minute=0, second=0))
+        return default_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def generate_reminders(
     days: list[DayEnum],
     timing: list[str],
@@ -59,7 +128,8 @@ def generate_reminders(
     
     # Ensure we have at least one time
     if not timing:
-        timing = ["10:00AM"]  # Default time
+        # Default time will be converted to ISO 8601 format when creating reminders
+        timing = ["10:00AM"]  # Default time (will be converted to ISO 8601 format with date)
     
     # Determine which days to use
     days_to_use = []
@@ -99,10 +169,12 @@ def generate_reminders(
         if current_day_enum in days_to_use:
             # Create a reminder for each time on this day
             for time_str in timing:
+                # Convert time to ISO 8601 format (YYYY-MM-DDTHH:mm:ssZ)
+                time_iso = convert_time_to_iso(time_str, current_date)
                 reminder = Reminder(
                     day=current_day_enum,
                     datte=current_date,
-                    time=time_str,
+                    time=time_iso,
                     isreminded=False,
                     isresponded=False,
                 )
@@ -146,6 +218,7 @@ For each medication, extract:
    - If "twice daily" or "two times a day" is mentioned, use ["10:00AM", "6:00PM"]
    - If "daily" or no specific time is mentioned, use ["10:00AM"] as default
    - If specific times are mentioned in the document, extract those exact times
+   - Note: Times will be automatically converted to ISO format (HH:MM:SS) in 24-hour format
 6. **days**: Array of specific days if applicable. Options: "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
    - For "daily" frequency: consider all days of the week starting from today 
    - For "twice_a_week" or "weekly": consider days of the week starting from today according to the frequency
@@ -350,12 +423,13 @@ async def parse_discharge_summary_with_vision(image_bytes_list: list[bytes], mod
                     except ValueError:
                         pass
                 
-                # Parse timing - accept time strings directly
+                # Parse timing - accept time strings directly (keep as time strings, not full ISO datetime)
                 timing = []
                 timing_data = med_data.get("timing", [])
                 
                 if timing_data:
-                    # If AI provided timing, use it (should be time strings like "10:00AM")
+                    # If AI provided timing, keep as time strings (e.g., "10:00AM", "6:00PM")
+                    # These will be converted to full ISO 8601 format when creating reminders
                     for t in timing_data:
                         if t and isinstance(t, str):
                             timing.append(t.strip())

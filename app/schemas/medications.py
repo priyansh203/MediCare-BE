@@ -49,7 +49,7 @@ class Reminder(BaseModel):
     
     day: DayEnum = Field(..., description="Day of the week")
     datte: date = Field(..., description="Actual date for this reminder")
-    time: str = Field(..., description="Time to take medication (e.g., '10:00AM', '6:00PM')")
+    time: str = Field(..., description="Time to take medication in ISO 8601 format (e.g., '2024-01-15T10:00:00Z', '2024-01-15T18:00:00Z')")
     isreminded: bool = Field(default=False, description="Whether reminder has been sent")
     isresponded: bool = Field(default=False, description="Whether patient has responded to reminder")
 
@@ -61,7 +61,7 @@ class MedicationDetail(BaseModel):
     dosage: str = Field(..., description="Medication dosage (e.g., 500mg, 10ml)")
     start_date: Optional[date] = Field(None, description="Medication start date")
     end_date: Optional[date] = Field(None, description="Medication end date")
-    timing: List[str] = Field(default_factory=list, description="Specific times to take medication (e.g., '10:00AM', '6:00PM')")
+    timing: List[str] = Field(default_factory=list, description="Specific times to take medication (e.g., '10:00AM', '6:00PM'). Will be converted to ISO 8601 format in reminders.")
     days: List[DayEnum] = Field(default_factory=list, description="Specific days of the week (if applicable)")
     frequency: FrequencyEnum = Field(FrequencyEnum.DAILY, description="Frequency of medication")
     status: MedicationStatus = Field(MedicationStatus.ACTIVE, description="Current status of medication")
