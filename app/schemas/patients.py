@@ -14,6 +14,8 @@ class Followup(BaseModel):
     """Followup tracking for appointments."""
     
     followup_date: date = Field(..., description="Followup date in ISO format")
+    reason: Optional[str] = Field(None, description="Reason for the followup appointment (optional, AI may not always provide)")
+    notes: Optional[str] = Field(None, description="Any additional notes about the followup appointment (optional, AI may not always provide)")
     isreminder1sent: bool = Field(default=False, description="Whether first reminder has been sent")
     isreminder2sent: bool = Field(default=False, description="Whether second reminder has been sent")
     status: FollowupStatus = Field(default=FollowupStatus.NOT_CONFIRMED, description="Followup status: confirmed or not_confirmed")

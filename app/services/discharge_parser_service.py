@@ -232,6 +232,8 @@ Also extract:
 - **additional_notes**: Any other relevant information, including warnings about medications to avoid
 - **appointment_followup**: Array of appointment followup dates. Extract any mentioned follow-up appointments, check-ups, or review dates.
   For each followup appointment, extract:
+  - **reason**: Reason for the followup appointment
+  - **notes**: Any other relevant information about the followup appointment
   - **followup_date**: Date of the followup appointment (format: YYYY-MM-DD)
   - **isreminder1sent**: Always set to false (default)
   - **isreminder2sent**: Always set to false (default)
@@ -251,12 +253,12 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure:
             "status": "active",
         }}
     ],
-    "patient_name": "string or null",
-    "discharge_date": "YYYY-MM-DD or null",
     "diagnosis": "string or null",
     "additional_notes": "string or null",
     "appointment_followup": [
         {{
+            "reason": "string",
+            "notes": "string",
             "followup_date": "YYYY-MM-DD",
             "isreminder1sent": false,
             "isreminder2sent": false,
@@ -517,6 +519,8 @@ async def parse_discharge_summary_with_vision(image_bytes_list: list[bytes], mod
                     
                     followup = Followup(
                         followup_date=followup_date,
+                        reason=followup_data.get("reason"),
+                        notes=followup_data.get("notes"),
                         isreminder1sent=followup_data.get("isreminder1sent", False),
                         isreminder2sent=followup_data.get("isreminder2sent", False),
                         status=status_val,

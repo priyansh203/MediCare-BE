@@ -47,3 +47,19 @@ async def root(request: Request):
 async def health_check(request: Request) -> Dict[str, Any]:
     """Health check endpoint returning basic API information."""
     return {"status": "healthy"}
+
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    
+    # Get port from environment variable (Render provides this)
+    port = int(os.getenv("PORT", 8000))
+    
+    # Bind to 0.0.0.0 for Render.com compatibility
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False
+    )
